@@ -1,25 +1,20 @@
 import { Schema, model } from 'mongoose';
 import validator from 'validator';
 
+
 import {
-  Guardian,
-  LocalGuardian,
-  Student,
-  UserName,
+  TGuardian,
+  TLocalGuardian,
+  TStudent,
+  StudentModel,
+  TUserName,
 } from './student.interface';
 
-const userNameSchema = new Schema<UserName>({
+const userNameSchema = new Schema<TUserName>({
   firstName: {
     type: String,
     required: [true, 'First name is required.'],
     trim: true,
-    // validate: {
-    //   validator: function (value: string){
-    //     const firstNameStr = value.charAt(0).toUpperCase() + value.slice(1);
-    //     return firstNameStr === value;
-    //   },
-    //   message: "{VALUE} is not capitalize format"
-    // }
   },
   middleName: {
     type: String,
@@ -29,14 +24,10 @@ const userNameSchema = new Schema<UserName>({
     type: String,
     required: [true, 'Last name is required.'],
     trim: true,
-    // validate: {
-    //   validator: (value: string) => validator.isAlpha(value),
-    //   message: "{VALUE} is not valid"
-    // }
   },
 });
 
-const guardianSchema = new Schema<Guardian>({
+const guardianSchema = new Schema<TGuardian>({
   fatherName: { type: String, required: [true, 'Father name is required.'] },
   fatherOccupation: {
     type: String,
@@ -53,11 +44,11 @@ const guardianSchema = new Schema<Guardian>({
   },
   motherContactNo: {
     type: String,
-    required: [true, 'Mother contact number is required.']
+    required: [true, 'Mother contact number is required.'],
   },
 });
 
-const localGuardianSchema = new Schema<LocalGuardian>({
+const localGuardianSchema = new Schema<TLocalGuardian>({
   name: { type: String, required: [true, 'Local guardian name is required.'] },
   occupation: {
     type: String,
@@ -74,13 +65,20 @@ const localGuardianSchema = new Schema<LocalGuardian>({
 });
 
 //* 2. Create a Schema corresponding to the document interface.
-const studentSchema = new Schema<Student>({
+const studentSchema = new Schema<TStudent, StudentModel>({
   id: {
     type: String,
     required: [true, 'Student ID is required.'],
     unique: true,
     trim: true,
   },
+  user: {
+    type: Schema.Types.ObjectId,
+    required: [true, 'User id is required'],
+    unique: true,
+    ref: 'User',
+  },
+  
   name: {
     type: userNameSchema,
     required: [true, 'Student name is required.'],
@@ -106,9 +104,9 @@ const studentSchema = new Schema<Student>({
     required: [true, 'Email is required.'],
     unique: true,
     validate: {
-      validator: (value: string)=> validator.isEmail(value),
-      message: "{VALUE} is not valid email"
-    }
+      validator: (value: string) => validator.isEmail(value),
+      message: '{VALUE} is not valid email',
+    },
   },
   contactNo: {
     type: String,
@@ -144,23 +142,40 @@ const studentSchema = new Schema<Student>({
   },
   profileImage: {
     type: String,
-    match: [
-      /^https?:\/\/.+\.(jpg|jpeg|png|gif)$/,
-      'Profile image must be a valid URL.',
-    ],
   },
-  isActive: {
-    type: String,
-    enum: {
-      values: ['Active', 'Blocked'],
-      message: "Status must be 'Active' or 'Blocked'.",
-    },
-    default: 'Active',
-    required: [true, 'Status is required.'],
+  isDeleted: {
+    type: Boolean,
+    default: false,
   },
 });
 
-//* 3. Create a Model.
-const StudentModel = model<Student>('Student', studentSchema);
 
-export default StudentModel;
+
+// * Query middleware:
+studentSchema.pre('find', function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+
+  next();
+});
+
+studentSchema.pre('findOne', function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
+studentSchema.pre('aggregate', function (next) {
+  this.pipeline().unshift({ $match: { isDeleted: { $ne: true } } });
+  next();
+});
+
+// * Creating a custom static method:
+studentSchema.statics.isUserExists = async function (id: string) {
+  const existingUser = await Student.findOne({ id });
+  return existingUser;
+};
+
+//* 3. Create a Model.
+export const Student = model<TStudent, StudentModel>('Student', studentSchema);
+
+

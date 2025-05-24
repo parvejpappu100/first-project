@@ -1,43 +1,7 @@
-import { Request, Response } from 'express';
+import { RequestHandler } from 'express';
 import { StudentServices } from './student.service';
-import studentValidationSchema from './student.validation';
 
-const createStudent = async (req: Request, res: Response) => {
-  try {
-    const { student: studentData } = req.body;
-
-    const {error } = studentValidationSchema.validate(studentData);
-
-    // will call service func to send this data
-    const result = await StudentServices.createStudentIntoDB(studentData);
-    
-    if(error){
-      res.status(500).json({
-        success: false,
-        message: 'Something went wrong!',
-        error: error.details,
-      });
-    }
-
-    
-
-    // send response;
-    res.status(200).json({
-      success: true,
-      message: 'Student is created successfully.',
-      data: result,
-    });
-  } catch (error) {
-    // send response;
-    res.status(500).json({
-      success: false,
-      message: 'Something went wrong!',
-      error: error,
-    }); 
-  }
-};
-
-const getAllStudents = async (req: Request, res: Response) => {
+const getAllStudents: RequestHandler = async (req, res, next) => {
   try {
     const result = await StudentServices.getAllStudentsDataFromDB();
 
@@ -48,11 +12,11 @@ const getAllStudents = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
-    console.log(error);
+    next(error);
   }
 };
 
-const getSingleStudent = async (req: Request, res: Response) => {
+const getSingleStudent: RequestHandler = async (req, res, next) => {
   try {
     const studentId = req.params.studentID;
 
@@ -64,13 +28,29 @@ const getSingleStudent = async (req: Request, res: Response) => {
       message: 'Get single students successfully',
       data: result,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// * to delete student data from db:
+const deleteStudentData: RequestHandler = async (req, res, next) => {
+  try {
+    const studentID = req.params.studentID;
+    const result = await StudentServices.deleteStudentFromDb(studentID);
+    // send response;
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully',
+      data: result,
+    });
   } catch (error) {
-    console.log(error);
+    next(error);
   }
 };
 
 export const StudentController = {
-  createStudent,
   getAllStudents,
   getSingleStudent,
+  deleteStudentData,
 };
